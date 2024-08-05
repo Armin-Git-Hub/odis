@@ -1,0 +1,10 @@
+[package]
+name = "odis"
+version = "0.0.1"
+edition = "2021"
+license = "GPL-3.0-or-later"
+
+[dependencies]
+
+[dev-dependencies]
+itertools = "0.13.0"
