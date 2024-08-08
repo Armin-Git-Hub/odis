@@ -1,7 +1,6 @@
 use std::{
     collections::{BTreeSet, HashSet},
-    fs::File,
-    io::{BufRead, BufReader, Error},
+    io::{BufRead, Error},
     num::ParseIntError,
 };
 
@@ -57,9 +56,8 @@ impl<T> FormalContext<T> {
     }
 
     /// Reads a formal context in Burmeister format.
-    pub fn read(path: String) -> Result<FormalContext<String>, FormatError> {
-        let file = File::open(&path)?;
-        let mut lines = BufReader::new(file).lines();
+    pub fn from(contents: &[u8]) -> Result<FormalContext<String>, FormatError> {
+        let mut lines = contents.lines();
 
         if lines.next().ok_or(FormatError::InvalidFormat)?? != "B" {
             return Err(FormatError::InvalidFormat);
@@ -169,7 +167,7 @@ impl<T> FormalContext<T> {
 #[cfg(test)]
 mod tests {
 
-    use std::collections::BTreeSet;
+    use std::{collections::BTreeSet, fs};
 
     use itertools::Itertools;
 
@@ -177,7 +175,8 @@ mod tests {
 
     #[test]
     fn test_read_context() {
-        let context = FormalContext::<String>::read("test_data/eu.cxt".to_string()).unwrap();
+        let context =
+            FormalContext::<String>::from(&fs::read("test_data/eu.cxt").unwrap()).unwrap();
         assert_eq!(context.objects.len(), 48);
         assert_eq!(context.objects[0], "Albanien");
         assert_eq!(context.objects[47], "Zypern");
@@ -198,7 +197,8 @@ mod tests {
 
     #[test]
     fn text_index_derivations() {
-        let context = FormalContext::<String>::read("test_data/eu.cxt".to_string()).unwrap();
+        let context =
+            FormalContext::<String>::from(&fs::read("test_data/eu.cxt").unwrap()).unwrap();
         // let empty_set = ;
         assert_eq!(
             context.index_attribute_derivation(&BTreeSet::new()).len(),
@@ -206,9 +206,10 @@ mod tests {
         );
         assert_eq!(context.index_object_derivation(&BTreeSet::new()).len(), 7);
 
-        let context =
-            FormalContext::<String>::read("test_data/living_beings_and_water.cxt".to_string())
-                .unwrap();
+        let context = FormalContext::<String>::from(
+            &fs::read("test_data/living_beings_and_water.cxt").unwrap(),
+        )
+        .unwrap();
         assert_eq!(
             context.index_attribute_derivation(&BTreeSet::from([0])),
             BTreeSet::from([0, 1, 2, 3, 4, 5, 6, 7])
@@ -250,9 +251,10 @@ mod tests {
 
     #[test]
     fn text_index_hulls() {
-        let context =
-            FormalContext::<String>::read("test_data/living_beings_and_water.cxt".to_string())
-                .unwrap();
+        let context = FormalContext::<String>::from(
+            &fs::read("test_data/living_beings_and_water.cxt").unwrap(),
+        )
+        .unwrap();
 
         assert_eq!(
             context.index_attribute_hull(&BTreeSet::from([])),
