@@ -11,3 +11,7 @@ impl<T> FormalContext<T> {
         next_closure::concepts(&self)
     }
 }
+
+
+
+//hello
