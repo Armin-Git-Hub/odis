@@ -6,19 +6,35 @@ use crate::FormalContext;
 
 // Enum containing the different outcomes of calling fcbo_next_concept
 enum OutputType {
-    // Contains a newly computed formal concept and its calling context
+    // Contains a newly computed formal concept and its index position
     CallingContext(
         (BTreeSet<usize>, BTreeSet<usize>), // 1: touple containing one formal concept
         usize,                              // 2: the index of the inner for loop
-        usize,                              // 3: current_node
     ),
-    // Contains a new dead end attribute set and its current node
+    // Contains a new dead end attribute set and its index position
     DeadEndAttributes(
-        BTreeSet<usize>, // 1: a new set of dead_end_attributes
-        usize,           // 2: the index of the new set to determine position
+        BTreeSet<usize>, // 1: one new dead end attribute set
+        usize,           // 2: the index of the inner for loop
     ),
     // Signals that a full node was cleared
     NodeCleared,
+}
+// Struct used as queue entries containing the calling context for fcbo_next_concept
+struct CallingContext {
+    input_attr: BTreeSet<usize>,                            // 1: set of input attributes
+    inner_index: usize,                                     // 2: index of the inner for loop
+    dead_end_attr: Option<HashMap<usize, BTreeSet<usize>>>, // 3: sets of dead end attributes
+}
+
+impl CallingContext {
+    // Creates a new instance of itself, the dead end attribute sets are added after the next node is cleared
+    fn new(input_attr: BTreeSet<usize>, inner_index: usize) -> Self {
+        CallingContext {
+            input_attr,
+            inner_index,
+            dead_end_attr: None,
+        }
+    }
 }
 
 // New canonicity test added in paper to prevent duplicate branches
@@ -26,10 +42,9 @@ fn canonicity_test_one(
     smaller_subsets: &Vec<BTreeSet<usize>>,
     inner_index: usize,
     input_attributes: &BTreeSet<usize>,
-    dead_end_attributes_set: &HashMap<(usize, usize), BTreeSet<usize>>,
-    parent_node: usize,
+    dead_end_attributes_set: &HashMap<usize, BTreeSet<usize>>,
 ) -> bool {
-    dead_end_attributes_set.get(&(parent_node, inner_index))
+    dead_end_attributes_set.get(&inner_index)
     .unwrap()
     .intersection(&smaller_subsets[inner_index])
     .collect::<BTreeSet<&usize>>()
@@ -61,15 +76,12 @@ fn fcbo_next_concept<T>(
     smaller_subsets: &Vec<BTreeSet<usize>>,
     input_attributes: &BTreeSet<usize>,
     inner_index: usize,
-    dead_end_attributes_set: &HashMap<(usize, usize), BTreeSet<usize>>,
-    parent_node: usize,
-    current_node: usize,
+    dead_end_attributes_set: &HashMap<usize, BTreeSet<usize>>,
 ) -> OutputType{
 
     for j in inner_index..context.attributes.len() {
 
-        if !input_attributes.contains(&j) && canonicity_test_one(smaller_subsets,j, input_attributes, dead_end_attributes_set, parent_node) {
-
+        if !input_attributes.contains(&j) && canonicity_test_one(smaller_subsets,j, input_attributes, dead_end_attributes_set) {
             let next_objects= context
             .index_attribute_derivation(input_attributes)
             .intersection(&context.index_attribute_derivation(&BTreeSet::from([j])))
@@ -78,7 +90,7 @@ fn fcbo_next_concept<T>(
             let next_attributes = context.index_object_derivation(&next_objects);
 
             if canonicity_test_two(smaller_subsets, j, input_attributes, &next_attributes) {
-                return OutputType::CallingContext((next_objects, next_attributes), j, current_node);
+                return OutputType::CallingContext((next_objects, next_attributes), j);
             } else {
                 return OutputType::DeadEndAttributes(next_attributes, j);
             }
@@ -93,30 +105,38 @@ fn fcbo_next_concept<T>(
 pub fn fcbo_concepts<'a, T>(
     context: &'a FormalContext<T>,
 ) -> impl Iterator<Item = (BTreeSet<usize>, BTreeSet<usize>)> + 'a {
-
+    
     // Initializing the starting state needed for calling fcbo_next_concept 
+
+    // Constant used throughout the function
+    let attr_length = context.attributes.len();
 
     // Subsets needed by the canonicity tests from the paper
     let mut smaller_subsets: Vec<BTreeSet<usize>> = Vec::new();
-    for i in 0..context.attributes.len() {
+    for i in 0..attr_length {
         smaller_subsets.push((0..i).collect());
     }
+
     // The first formal concept, usually ({"all objects"},{})
     let starting_objects = context.index_attribute_derivation(&BTreeSet::new());
     let mut input_attributes = context.index_object_derivation(&starting_objects);
-    // Initial values for the first call of fcbo_next_concept
-    let mut inner_index = 0;
-    let mut parent_node = 0;
-    let mut current_node: usize = 0;
-    let mut total_nodes: usize = 0;
-    // The first dead end attribue sets initialized to the empty set to always pass the first canonicity test
-    let mut dead_end_attributes_set = HashMap::new();
-    for i in 0..context.attributes.len() {
-        dead_end_attributes_set.insert((current_node, i), BTreeSet::new());
-    }
-    // Queue containing all necessary information to call fcbo_next_concept
-    let mut queue: VecDeque<(BTreeSet<usize>, usize, usize, usize)> = VecDeque::new();
 
+    // Set the start of the for loop of fcbo_next_concepts to 0
+    let mut inner_index = 0;
+
+    // The first dead end attribue set initialized with empty sets to pass the first canonicity test
+    let mut dead_end_attr_set = HashMap::new();
+    for i in 0..attr_length {
+        dead_end_attr_set.insert(i, BTreeSet::new());
+    }
+
+    // Queue containing calling context of fcbo_next_concept
+    let mut queue: VecDeque<CallingContext> = VecDeque::new();
+
+    // Records the number of branches that a nodes generates
+    let mut branches: usize = 0;
+
+    // Condition to print the first formal concept
     let mut first_concept = true;
 
     std::iter::from_fn(move || {
@@ -127,43 +147,57 @@ pub fn fcbo_concepts<'a, T>(
         }
         // Loops until a new formal concept is returned by fcbo_next_concept
         loop {
-            let output = fcbo_next_concept(context, &smaller_subsets, &input_attributes, inner_index, &dead_end_attributes_set, parent_node, current_node);
+            let output = fcbo_next_concept(
+                context,
+                &smaller_subsets,
+                &input_attributes,
+                inner_index,
+                &dead_end_attr_set
+            );
 
             match output {
-                // 1: A new concept is added to the queue and the concept is returned
-                OutputType::CallingContext(formal_concept, previous_inner_index, current_node) => {
-                    // Checks the halting condition before adding the new concept to queue to prevent unnecessary queue entries
-                    if formal_concept.1 != (0..context.attributes.len()).collect() && previous_inner_index < context.attributes.len() - 1 {
-                        total_nodes += 1;
-                        queue.push_back((formal_concept.1.clone(), previous_inner_index + 1 , total_nodes, current_node));
-                    }
+                // 1: New concept is added to queue and the concept is returned, increments index for the next fcbo_next_concept call
+                OutputType::CallingContext(formal_concept, previous_inner_index) => {
+
                     // Increments the index for the next call of fcbo_next_concept
                     inner_index = previous_inner_index + 1;
+
+                    // Checks the halting condition before adding the new concept to queue to prevent unnecessary queue entries
+                    if formal_concept.1 != (0..attr_length).collect() && previous_inner_index < attr_length - 1 {
+                        branches += 1;
+                        queue.push_back(CallingContext::new(formal_concept.1.clone(), inner_index));
+                    }
                     return Some(formal_concept);
                 }
-                // 2: Adds the new dead end attribute and increments the index for the next call of fcbo_next_concept
+                // 2: Saves the new dead end attribute and increments the index for the next call of fcbo_next_concept
                 OutputType::DeadEndAttributes(dead_end_attributes, previous_inner_index) => {
-                    dead_end_attributes_set.insert((current_node, previous_inner_index), dead_end_attributes);
+                    dead_end_attr_set.insert(previous_inner_index, dead_end_attributes);
                     inner_index = previous_inner_index + 1;
                 }
-                // 3: Finishes the algorithm upon empty queue or updates the calling context of fcbo_next_concept
+                // 3: Finishes algorithm upon empty queue or updates calling context and inserts new dead end attribte set into queue
                 OutputType::NodeCleared => {
                     if queue.len() < 1 {
                         return None;
                     }
-                    // Processes the front queue entry
-                    (input_attributes, inner_index, current_node, parent_node) = queue.pop_front().unwrap();
-                    // Copies dead end attribute sets from the parent node if no set was added at the specific index in (2)
-                    for i in inner_index..context.attributes.len() {
-                        if !dead_end_attributes_set.contains_key(&(current_node, i)) {
-                            dead_end_attributes_set.insert((current_node, i), dead_end_attributes_set.get(&(parent_node, i)).unwrap().clone());
+                    // If branches were generated, the next dead end attributes are added to their queue entries
+                    if branches != 0 {
+                        for j in 0..queue[queue.len() - branches].inner_index {
+                            dead_end_attr_set.remove(&j);
                         }
+                        for i in (queue.len() - branches)..(queue.len()) {
+                            queue[i].dead_end_attr = Some(dead_end_attr_set.clone());
+                        }
+                        branches = 0;
                     }
+                    // Processes the front queue entry by updating the calling context
+                    let state = queue.pop_front().unwrap();
+                    input_attributes = state.input_attr;
+                    inner_index = state.inner_index;
+                    dead_end_attr_set = state.dead_end_attr.unwrap();
                 }
             }
         }
-    })
-}
+    })}
 
 
 #[cfg(test)]
