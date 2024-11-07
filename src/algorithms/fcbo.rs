@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, HashMap, VecDeque};
+use std::collections::{BTreeSet, HashMap};
 
 use crate::FormalContext;
 
@@ -42,9 +42,9 @@ fn canonicity_test_one(
     smaller_subsets: &Vec<BTreeSet<usize>>,
     inner_index: usize,
     input_attributes: &BTreeSet<usize>,
-    dead_end_attributes_set: &HashMap<usize, BTreeSet<usize>>,
+    dead_end_attr_set: &HashMap<usize, BTreeSet<usize>>,
 ) -> bool {
-    dead_end_attributes_set.get(&inner_index)
+    dead_end_attr_set.get(&inner_index)
     .unwrap()
     .intersection(&smaller_subsets[inner_index])
     .collect::<BTreeSet<&usize>>()
@@ -76,12 +76,12 @@ fn fcbo_next_concept<T>(
     smaller_subsets: &Vec<BTreeSet<usize>>,
     input_attributes: &BTreeSet<usize>,
     inner_index: usize,
-    dead_end_attributes_set: &HashMap<usize, BTreeSet<usize>>,
+    dead_end_attr_set: &HashMap<usize, BTreeSet<usize>>,
 ) -> OutputType{
 
     for j in inner_index..context.attributes.len() {
 
-        if !input_attributes.contains(&j) && canonicity_test_one(smaller_subsets,j, input_attributes, dead_end_attributes_set) {
+        if !input_attributes.contains(&j) && canonicity_test_one(smaller_subsets,j, input_attributes, dead_end_attr_set) {
             let next_objects= context
             .index_attribute_derivation(input_attributes)
             .intersection(&context.index_attribute_derivation(&BTreeSet::from([j])))
@@ -105,7 +105,6 @@ fn fcbo_next_concept<T>(
 pub fn fcbo_concepts<'a, T>(
     context: &'a FormalContext<T>,
 ) -> impl Iterator<Item = (BTreeSet<usize>, BTreeSet<usize>)> + 'a {
-    
     // Initializing the starting state needed for calling fcbo_next_concept 
 
     // Constant used throughout the function
@@ -131,7 +130,7 @@ pub fn fcbo_concepts<'a, T>(
     }
 
     // Queue containing calling context of fcbo_next_concept
-    let mut queue: VecDeque<CallingContext> = VecDeque::new();
+    let mut queue: Vec<CallingContext> = Vec::with_capacity(attr_length * 5);
 
     // Records the number of branches that a nodes generates
     let mut branches: usize = 0;
@@ -165,7 +164,7 @@ pub fn fcbo_concepts<'a, T>(
                     // Checks the halting condition before adding the new concept to queue to prevent unnecessary queue entries
                     if formal_concept.1 != (0..attr_length).collect() && previous_inner_index < attr_length - 1 {
                         branches += 1;
-                        queue.push_back(CallingContext::new(formal_concept.1.clone(), inner_index));
+                        queue.push(CallingContext::new(formal_concept.1.clone(), inner_index));
                     }
                     return Some(formal_concept);
                 }
@@ -190,14 +189,15 @@ pub fn fcbo_concepts<'a, T>(
                         branches = 0;
                     }
                     // Processes the front queue entry by updating the calling context
-                    let state = queue.pop_front().unwrap();
+                    let state = queue.pop().unwrap();
                     input_attributes = state.input_attr;
                     inner_index = state.inner_index;
                     dead_end_attr_set = state.dead_end_attr.unwrap();
                 }
             }
         }
-    })}
+    })
+}
 
 
 #[cfg(test)]
