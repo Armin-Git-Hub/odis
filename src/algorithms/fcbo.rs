@@ -1,4 +1,5 @@
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
+use bit_set::BitSet;
 
 use crate::FormalContext;
 
@@ -7,28 +8,35 @@ use crate::FormalContext;
 // Enum containing the different outcomes of calling fcbo_next_concept
 enum OutputType {
     // Contains a newly computed formal concept and its index position
-    CallingContext(
-        (BTreeSet<usize>, BTreeSet<usize>), // 1: touple containing one formal concept
-        usize,                              // 2: the index of the inner for loop
+    FormalConcept(
+        // 1: touple containing one formal concept
+        (BitSet, BitSet),
+        // 2: the index of the inner for loop
+        usize,
     ),
     // Contains a new dead end attribute set and its index position
     DeadEndAttributes(
-        BTreeSet<usize>, // 1: one new dead end attribute set
-        usize,           // 2: the index of the inner for loop
+        // 1: one new dead end attribute set
+        BitSet,
+        // 2: the index of the inner for loop
+        usize,
     ),
     // Signals that a full node was cleared
     NodeCleared,
 }
 // Struct used as queue entries containing the calling context for fcbo_next_concept
 struct CallingContext {
-    input_attr: BTreeSet<usize>,                            // 1: set of input attributes
-    inner_index: usize,                                     // 2: index of the inner for loop
-    dead_end_attr: Option<HashMap<usize, BTreeSet<usize>>>, // 3: sets of dead end attributes
+    // 1: set of input attributes
+    input_attr: BitSet,
+    // 2: index of the inner for loop
+    inner_index: usize,
+    // 3: sets of dead end attributes
+    dead_end_attr: Option<HashMap<usize, BitSet>>,
 }
 
 impl CallingContext {
     // Creates a new instance of itself, the dead end attribute sets are added after the next node is cleared
-    fn new(input_attr: BTreeSet<usize>, inner_index: usize) -> Self {
+    fn new(input_attr: BitSet, inner_index: usize) -> Self {
         CallingContext {
             input_attr,
             inner_index,
@@ -39,29 +47,29 @@ impl CallingContext {
 
 // New canonicity test added in paper to prevent duplicate branches
 fn canonicity_test_one(
-    smaller_subsets: &Vec<BTreeSet<usize>>,
+    smaller_subsets: &Vec<BitSet>,
     inner_index: usize,
-    input_attributes: &BTreeSet<usize>,
-    dead_end_attr_set: &HashMap<usize, BTreeSet<usize>>,
+    input_attributes: &BitSet,
+    dead_end_attr_set: &HashMap<usize, BitSet>,
 ) -> bool {
     dead_end_attr_set.get(&inner_index)
     .unwrap()
     .intersection(&smaller_subsets[inner_index])
-    .collect::<BTreeSet<&usize>>()
+    .collect::<BitSet>()
     .is_subset(&input_attributes.intersection(&smaller_subsets[inner_index])
-    .collect())    
+    .collect())
 }
 
 // Old canonicity test from paper
 fn canonicity_test_two(
-    smaller_subsets: &Vec<BTreeSet<usize>>,
+    smaller_subsets: &Vec<BitSet>,
     inner_index: usize,
-    input_attributes: &BTreeSet<usize>,
-    next_attributes: &BTreeSet<usize>,
+    input_attributes: &BitSet,
+    next_attributes: &BitSet,
 ) -> bool {
     input_attributes
     .intersection(&smaller_subsets[inner_index])
-    .collect::<BTreeSet<&usize>>()
+    .collect::<BitSet>()
     ==
     next_attributes
     .intersection(&smaller_subsets[inner_index])
@@ -73,24 +81,26 @@ fn canonicity_test_two(
 // Closely follows the pseudo code from paper but leaves out the halting condition which is checked in fcbo_concepts
 fn fcbo_next_concept<T>(
     context: &FormalContext<T>,
-    smaller_subsets: &Vec<BTreeSet<usize>>,
-    input_attributes: &BTreeSet<usize>,
+    smaller_subsets: &Vec<BitSet>,
+    input_attributes: &BitSet,
     inner_index: usize,
-    dead_end_attr_set: &HashMap<usize, BTreeSet<usize>>,
+    dead_end_attr_set: &HashMap<usize, BitSet>,
 ) -> OutputType{
 
     for j in inner_index..context.attributes.len() {
 
-        if !input_attributes.contains(&j) && canonicity_test_one(smaller_subsets,j, input_attributes, dead_end_attr_set) {
+        if !input_attributes.contains(j) && canonicity_test_one(smaller_subsets,j, input_attributes, dead_end_attr_set) {
+            let mut new_attr = BitSet::new();
+            new_attr.insert(j);
+
             let next_objects= context
             .index_attribute_derivation(input_attributes)
-            .intersection(&context.index_attribute_derivation(&BTreeSet::from([j])))
-            .cloned()
+            .intersection(&context.index_attribute_derivation(&new_attr))
             .collect();
             let next_attributes = context.index_object_derivation(&next_objects);
 
             if canonicity_test_two(smaller_subsets, j, input_attributes, &next_attributes) {
-                return OutputType::CallingContext((next_objects, next_attributes), j);
+                return OutputType::FormalConcept((next_objects, next_attributes), j);
             } else {
                 return OutputType::DeadEndAttributes(next_attributes, j);
             }
@@ -104,33 +114,33 @@ fn fcbo_next_concept<T>(
 // The concepts are only calculated when requested with .next() or .collect()
 pub fn fcbo_concepts<'a, T>(
     context: &'a FormalContext<T>,
-) -> impl Iterator<Item = (BTreeSet<usize>, BTreeSet<usize>)> + 'a {
+) -> impl Iterator<Item = (BitSet, BitSet)> + 'a {
     // Initializing the starting state needed for calling fcbo_next_concept 
 
     // Constant used throughout the function
     let attr_length = context.attributes.len();
 
     // Subsets needed by the canonicity tests from the paper
-    let mut smaller_subsets: Vec<BTreeSet<usize>> = Vec::new();
+    let mut smaller_subsets: Vec<BitSet> = Vec::new();
     for i in 0..attr_length {
         smaller_subsets.push((0..i).collect());
     }
 
     // The first formal concept, usually ({"all objects"},{})
-    let starting_objects = context.index_attribute_derivation(&BTreeSet::new());
+    let starting_objects = context.index_attribute_derivation(&BitSet::new());
     let mut input_attributes = context.index_object_derivation(&starting_objects);
 
-    // Set the start of the for loop of fcbo_next_concepts to 0
+    // Set the starting attribute of the for loop of fcbo_next_concepts to 0
     let mut inner_index = 0;
 
     // The first dead end attribue set initialized with empty sets to pass the first canonicity test
     let mut dead_end_attr_set = HashMap::new();
     for i in 0..attr_length {
-        dead_end_attr_set.insert(i, BTreeSet::new());
+        dead_end_attr_set.insert(i, BitSet::new());
     }
 
     // Queue containing calling context of fcbo_next_concept
-    let mut queue: Vec<CallingContext> = Vec::with_capacity(attr_length * 5);
+    let mut queue: Vec<CallingContext> = Vec::new();
 
     // Records the number of branches that a nodes generates
     let mut branches: usize = 0;
@@ -156,7 +166,7 @@ pub fn fcbo_concepts<'a, T>(
 
             match output {
                 // 1: New concept is added to queue and the concept is returned, increments index for the next fcbo_next_concept call
-                OutputType::CallingContext(formal_concept, previous_inner_index) => {
+                OutputType::FormalConcept(formal_concept, previous_inner_index) => {
 
                     // Increments the index for the next call of fcbo_next_concept
                     inner_index = previous_inner_index + 1;
@@ -202,7 +212,9 @@ pub fn fcbo_concepts<'a, T>(
 
 #[cfg(test)]
 mod tests {
+    
     use std::{collections::BTreeSet, fs};
+    use bit_set::BitSet;
     use itertools::Itertools;
 
     use crate::{algorithms::fcbo::fcbo_concepts, FormalContext};
@@ -215,7 +227,7 @@ mod tests {
 
         let mut concepts_val = BTreeSet::new();
         for ms in (0..context.attributes.len()).powerset() {
-            let sub: BTreeSet<usize> = ms.into_iter().collect();
+            let sub: BitSet = ms.into_iter().collect();
             let hull = context.index_attribute_hull(&sub);
             if sub == hull {
                 concepts_val.insert(hull);
@@ -232,7 +244,7 @@ mod tests {
 
         let mut concepts_val = BTreeSet::new();
         for ms in (0..context.attributes.len()).powerset() {
-            let sub: BTreeSet<usize> = ms.into_iter().collect();
+            let sub: BitSet = ms.into_iter().collect();
             let hull = context.index_attribute_hull(&sub);
             if sub == hull {
                 concepts_val.insert(hull);
@@ -249,7 +261,7 @@ mod tests {
 
         let mut concepts_val = BTreeSet::new();
         for ms in (0..context.attributes.len()).powerset() {
-            let sub: BTreeSet<usize> = ms.into_iter().collect();
+            let sub: BitSet = ms.into_iter().collect();
             let hull = context.index_attribute_hull(&sub);
             if sub == hull {
                 concepts_val.insert(hull);
