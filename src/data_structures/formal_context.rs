@@ -143,125 +143,123 @@ impl<T> FormalContext<T> {
 #[cfg(test)]
 mod tests {
 
-    // use std::{collections::BTreeSet, fs};
+    use std::fs;
+    use bit_set::BitSet;
+    use itertools::Itertools;
+    use super::FormalContext;
+    #[test]
+    fn test_read_context() {
+        let context =
+            FormalContext::<String>::from(&fs::read("test_data/eu.cxt").unwrap()).unwrap();
+        assert_eq!(context.objects.len(), 48);
+        assert_eq!(context.objects[0], "Albanien");
+        assert_eq!(context.objects[47], "Zypern");
+        assert_eq!(context.attributes.len(), 7);
+        assert_eq!(context.attributes[0], "EU");
+        assert_eq!(context.attributes[6], "Europarat");
+        assert_eq!(context.incidence.len(), 201);
+        assert!(!context.incidence.contains(&(1, 0)));
+        assert!(context.incidence.contains(&(1, 1)));
+        assert!(!context.incidence.contains(&(1, 2)));
+        assert!(!context.incidence.contains(&(1, 3)));
+        assert!(!context.incidence.contains(&(1, 4)));
+        assert!(context.incidence.contains(&(1, 5)));
+        assert!(context.incidence.contains(&(1, 6)));
+    }
+    #[test]
+    fn text_index_derivations() {
+        let context =
+            FormalContext::<String>::from(&fs::read("test_data/eu.cxt").unwrap()).unwrap();
 
-    // use itertools::Itertools;
-
-    // use super::FormalContext;
-
-    // #[test]
-    // fn test_read_context() {
-    //     let context =
-    //         FormalContext::<String>::from(&fs::read("test_data/eu.cxt").unwrap()).unwrap();
-    //     assert_eq!(context.objects.len(), 48);
-    //     assert_eq!(context.objects[0], "Albanien");
-    //     assert_eq!(context.objects[47], "Zypern");
-
-    //     assert_eq!(context.attributes.len(), 7);
-    //     assert_eq!(context.attributes[0], "EU");
-    //     assert_eq!(context.attributes[6], "Europarat");
-
-    //     assert_eq!(context.incidence.len(), 201);
-    //     assert!(!context.incidence.contains(&(1, 0)));
-    //     assert!(context.incidence.contains(&(1, 1)));
-    //     assert!(!context.incidence.contains(&(1, 2)));
-    //     assert!(!context.incidence.contains(&(1, 3)));
-    //     assert!(!context.incidence.contains(&(1, 4)));
-    //     assert!(context.incidence.contains(&(1, 5)));
-    //     assert!(context.incidence.contains(&(1, 6)));
-    // }
-
-    // #[test]
-    // fn text_index_derivations() {
-    //     let context =
-    //         FormalContext::<String>::from(&fs::read("test_data/eu.cxt").unwrap()).unwrap();
-    //     // let empty_set = ;
-    //     assert_eq!(
-    //         context.index_attribute_derivation(&BTreeSet::new()).len(),
-    //         48
-    //     );
-    //     assert_eq!(context.index_object_derivation(&BTreeSet::new()).len(), 7);
-
-    //     let context = FormalContext::<String>::from(
-    //         &fs::read("test_data/living_beings_and_water.cxt").unwrap(),
-    //     )
-    //     .unwrap();
-    //     assert_eq!(
-    //         context.index_attribute_derivation(&BTreeSet::from([0])),
-    //         BTreeSet::from([0, 1, 2, 3, 4, 5, 6, 7])
-    //     );
-    //     assert_eq!(
-    //         context.index_attribute_derivation(&BTreeSet::from([1])),
-    //         BTreeSet::from([0, 1, 2, 4, 5])
-    //     );
-    //     assert_eq!(
-    //         context.index_attribute_derivation(&BTreeSet::from([0, 1])),
-    //         BTreeSet::from([0, 1, 2, 4, 5])
-    //     );
-    //     assert_eq!(
-    //         context.index_attribute_derivation(&BTreeSet::from([0, 1, 2, 3, 4, 5])),
-    //         BTreeSet::from([])
-    //     );
-    //     assert_eq!(
-    //         context.index_attribute_derivation(&BTreeSet::from([0, 1, 2, 3, 4, 5])),
-    //         BTreeSet::from([])
-    //     );
-    //     assert_eq!(
-    //         context.index_attribute_derivation(&BTreeSet::from([3, 4])),
-    //         BTreeSet::from([6])
-    //     );
-    //     assert_eq!(
-    //         context.index_attribute_derivation(&BTreeSet::from([2, 6, 7])),
-    //         BTreeSet::from([2, 3])
-    //     );
-
-    //     assert_eq!(
-    //         context.index_object_derivation(&BTreeSet::from([0])),
-    //         BTreeSet::from([0, 1, 6])
-    //     );
-    //     assert_eq!(
-    //         context.index_object_derivation(&BTreeSet::from([0, 1, 2, 3])),
-    //         BTreeSet::from([0, 6])
-    //     );
-    // }
-
-    // #[test]
-    // fn text_index_hulls() {
-    //     let context = FormalContext::<String>::from(
-    //         &fs::read("test_data/living_beings_and_water.cxt").unwrap(),
-    //     )
-    //     .unwrap();
-
-    //     assert_eq!(
-    //         context.index_attribute_hull(&BTreeSet::from([])),
-    //         BTreeSet::from([0])
-    //     );
-
-    //     assert_eq!(
-    //         context.index_object_hull(&BTreeSet::from([])),
-    //         BTreeSet::from([])
-    //     );
-
-    //     assert_eq!(
-    //         context.index_attribute_hull(&(0..context.attributes.len()).collect()),
-    //         (0..context.attributes.len()).collect()
-    //     );
-
-    //     assert_eq!(
-    //         context.index_object_hull(&(0..context.objects.len()).collect()),
-    //         (0..context.objects.len()).collect()
-    //     );
-
-    //     for gs in (0..context.objects.len()).powerset() {
-    //         let sub: BTreeSet<usize> = gs.into_iter().collect();
-    //         let hull = context.index_object_hull(&sub);
-    //         assert!(sub.is_subset(&hull));
-    //     }
-
-    //     for ms in (0..context.attributes.len()).powerset() {
-    //         let sub: BTreeSet<usize> = ms.into_iter().collect();
-    //         let hull = context.index_attribute_hull(&sub);
-    //         assert!(sub.is_subset(&hull));
-    //     }
-    // }
+        assert_eq!(
+            context.index_attribute_derivation(&BitSet::new()).len(),
+            48
+        );
+        assert_eq!(context.index_object_derivation(&BitSet::new()).len(), 7);
+        let context = FormalContext::<String>::from(
+            &fs::read("test_data/living_beings_and_water.cxt").unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            // [0]
+            context.index_attribute_derivation(&BitSet::from_bytes(&[0b10000000])),
+            // [0, 1, 2, 3, 4, 5, 6, 7]
+            BitSet::from_bytes(&[0b11111111])
+        );
+        assert_eq!(
+            // [1]
+            context.index_attribute_derivation(&BitSet::from_bytes(&[0b01000000])),
+            // [0, 1, 2, 4, 5]
+            BitSet::from_bytes(&[0b11101100])
+        );
+        assert_eq!(
+            // [0, 1]
+            context.index_attribute_derivation(&BitSet::from_bytes(&[0b11000000])),
+            // [0, 1, 2, 4, 5]
+            BitSet::from_bytes(&[0b11101100])
+        );
+        assert_eq!(
+            // [0, 1, 2, 3, 4, 5]
+            context.index_attribute_derivation(&BitSet::from_bytes(&[0b11111100])),
+            // []
+            BitSet::from_bytes(&[0b00000000])
+        );
+        assert_eq!(
+            // [3, 4]
+            context.index_attribute_derivation(&BitSet::from_bytes(&[0b00011000])),
+            // [6]
+            BitSet::from_bytes(&[0b00000010])
+        );
+        assert_eq!(
+            // [2, 6, 7]
+            context.index_attribute_derivation(&BitSet::from_bytes(&[0b00100011])),
+            // [2, 3]
+            BitSet::from_bytes(&[0b00110000])
+        );
+        assert_eq!(
+            // [0]
+            context.index_object_derivation(&BitSet::from_bytes(&[0b10000000])),
+            // [0, 1, 6]
+            BitSet::from_bytes(&[0b11000010])
+        );
+        assert_eq!(
+            // [0, 1, 2, 3]
+            context.index_object_derivation(&BitSet::from_bytes(&[0b11110000])),
+            // [0, 6]
+            BitSet::from_bytes(&[0b10000010])
+        );
+    }
+    #[test]
+    fn text_index_hulls() {
+        let context = FormalContext::<String>::from(
+            &fs::read("test_data/living_beings_and_water.cxt").unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            context.index_attribute_hull(&BitSet::from_bytes(&[0b00000000])),
+            BitSet::from_bytes(&[0b10000000])
+        );
+        assert_eq!(
+            context.index_object_hull(&BitSet::from_bytes(&[0b00000000])),
+            BitSet::from_bytes(&[0b00000000])
+        );
+        assert_eq!(
+            context.index_attribute_hull(&(0..context.attributes.len()).collect()),
+            (0..context.attributes.len()).collect()
+        );
+        assert_eq!(
+            context.index_object_hull(&(0..context.objects.len()).collect()),
+            (0..context.objects.len()).collect()
+        );
+        for gs in (0..context.objects.len()).powerset() {
+            let sub: BitSet = gs.into_iter().collect();
+            let hull = context.index_object_hull(&sub);
+            assert!(sub.is_subset(&hull));
+        }
+        for ms in (0..context.attributes.len()).powerset() {
+            let sub: BitSet = ms.into_iter().collect();
+            let hull = context.index_attribute_hull(&sub);
+            assert!(sub.is_subset(&hull));
+        }
+    }
 }
