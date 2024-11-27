@@ -2,7 +2,7 @@
 name = "odis"
 version = "0.0.1"
 edition = "2021"
-license = "GPL-3.0-or-later"
+license = "AGPL-3.0-only"
 
 [dependencies]
 bit-set = "0.8.0"
