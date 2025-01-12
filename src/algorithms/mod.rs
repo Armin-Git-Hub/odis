@@ -3,9 +3,7 @@ use bit_set::BitSet;
 use crate::FormalContext;
 
 pub mod next_closure;
-
 pub mod fcbo;
-
 pub mod canonical_basis;
 
 impl<T> FormalContext<T> {

@@ -2,7 +2,7 @@ use bit_set::BitSet;
 
 use crate::FormalContext;
 
-fn largest_entry(max: usize, input_set: &BitSet) -> bool {
+fn is_smallest_num(max: usize, input_set: &BitSet) -> bool {
     for n in 0..max {
         if input_set.contains(n) {
             return false;
@@ -11,35 +11,12 @@ fn largest_entry(max: usize, input_set: &BitSet) -> bool {
     true
 }
 
-fn set_excluding_input(n: usize) -> BitSet {
+fn set_upto(n: usize) -> BitSet {
     let mut b = BitSet::new();
-    for i in 0..n {
+    for i in 0..n + 1 {
         b.insert(i);
     }
     b
-}
-
-fn next_preclosure<T>(
-    context: &FormalContext<T>,
-    implications: &Vec<(BitSet, BitSet)>,
-    input: &BitSet,
-) -> BitSet {
-    let mut temp_set = input.clone();
-    let mut current_attribute = BitSet::new();
-
-    for n in (0..context.attributes.len()).rev() {
-        current_attribute.insert(n);
-        if temp_set.contains(n) {
-            temp_set.remove(n);
-        } else {
-            let output = implication_closure(implications, &temp_set.union(&current_attribute).collect());
-            if largest_entry(n, &output.difference(&temp_set).collect()) {
-                return output;
-            }
-        }
-        current_attribute.remove(n);
-    }
-    return (0..context.attributes.len()).collect();
 }
 
 fn implication_closure(implications: &Vec<(BitSet, BitSet)>, input: &BitSet) -> BitSet {
@@ -49,7 +26,7 @@ fn implication_closure(implications: &Vec<(BitSet, BitSet)>, input: &BitSet) -> 
         let mut indices = BitSet::new();
         let mut repeat = false;
         for (index, (premise, conclusion )) in implications.iter().enumerate() {
-            if premise.is_subset(&input) {
+            if premise.is_subset(&output) {
                 output.union_with(&conclusion);
                 indices.insert(index);
                 repeat = true;
@@ -72,11 +49,34 @@ fn implication_closure(implications: &Vec<(BitSet, BitSet)>, input: &BitSet) -> 
     output
 }
 
+fn next_preclosure<T>(
+    context: &FormalContext<T>,
+    implications: &Vec<(BitSet, BitSet)>,
+    input: &BitSet,
+) -> BitSet {
+    let mut temp_set = input.clone();
+    let mut current_attribute = BitSet::new();
+
+    for n in (0..context.attributes.len()).rev() {
+        current_attribute.insert(n);
+        if temp_set.contains(n) {
+            temp_set.remove(n);
+        } else {
+            let output: BitSet = implication_closure(implications, &temp_set.union(&current_attribute).collect());
+            if is_smallest_num(n, &output.difference(&temp_set).collect()) {
+                return output;
+            }
+        }
+        current_attribute.clear();
+    }
+    return (0..context.attributes.len()).collect();
+}
+
 pub fn canonical_basis<T>(context: &FormalContext<T>) -> Vec<(BitSet, BitSet)> {
     let mut temp_set = BitSet::new();
     let mut implications: Vec<(BitSet, BitSet)> = Vec::new();
 
-    while temp_set != set_excluding_input(context.attributes.len()) {
+    while temp_set != set_upto(context.attributes.len() - 1) {
         let temp_set_hull = context.index_attribute_hull(&temp_set);
         if temp_set != temp_set_hull {
             implications.push((temp_set.clone(), temp_set_hull));
@@ -100,7 +100,6 @@ mod tests {
         
         let output = canonical_basis(&context);
 
-        // Premises are added in lectical order, the same way they are calculated
         let mut canonical_basis = Vec::new();
         // {3,4} -> {0,1,2,3,4}
         canonical_basis.push((BitSet::from_bytes(&[0b00011000]), BitSet::from_bytes(&[0b11111000])));
@@ -125,24 +124,20 @@ mod tests {
         let input = BitSet::new();
         let output = next_preclosure(&context, &canonical_basis, &input);
         assert_eq!(output, BitSet::from_bytes(&[0b00001000]));
-        println!("{:?}", output);
 
         let input = BitSet::from_bytes(&[0b00001000]);
         let output = next_preclosure(&context, &canonical_basis, &input);
         assert_eq!(output, BitSet::from_bytes(&[0b00010000]));
-        println!("{:?}", output);
 
         let input = BitSet::from_bytes(&[0b00010000]);
         let output = next_preclosure(&context, &canonical_basis, &input);
         assert_eq!(output, BitSet::from_bytes(&[0b00011000]));
-        println!("{:?}", output);
 
         // {3,4} -> {0,1,2,3,4}
         canonical_basis.push((BitSet::from_bytes(&[0b00011000]), BitSet::from_bytes(&[0b11111000])));
         let input = BitSet::from_bytes(&[0b00011000]);
         let output = next_preclosure(&context, &canonical_basis, &input);
         assert_eq!(output, BitSet::from_bytes(&[0b00100000]));
-        println!("{:?}", output);
     }
 
     #[test]
