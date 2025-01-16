@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use bit_set::BitSet;
 
 use crate::FormalContext;
@@ -49,6 +50,48 @@ fn implication_closure(implications: &Vec<(BitSet, BitSet)>, input: &BitSet) -> 
     output
 }
 
+fn implication_closure_lin(implications: &Vec<(BitSet, BitSet)>, input: &BitSet) -> BitSet {
+    let mut output = input.clone();
+
+    let mut count: HashMap<(&BitSet, &BitSet), usize> = HashMap::new();
+    let mut list: HashMap<usize, Vec<(&BitSet, &BitSet)>> = HashMap::new();
+
+    for (premise, conclusion) in implications {
+        count.insert((premise, conclusion), premise.len());
+        if premise.len() == 0 {
+            output.union_with(conclusion);
+        }
+        for a in premise {
+            if list.contains_key(&a) {
+                list.get_mut(&a).unwrap().push((premise, conclusion));
+            } else {
+                let new_vec = vec![(premise, conclusion)];
+                list.insert(a, new_vec);
+            }
+        }
+    }
+
+    let mut update = output.clone(); 
+
+    while update != BitSet::new() {
+        let m = update.iter().next().unwrap();
+        update.remove(m);
+
+        if list.contains_key(&m) {
+            for entry in list.get(&m).unwrap() {
+                *count.get_mut(entry).unwrap() -= 1; 
+                if *count.get(entry).unwrap() == 0 {
+                    let add = entry.1.difference(&output).collect();
+                    output.union_with(&add);
+                    update.union_with(&add);
+                }
+            }
+        }
+    }
+    output  
+}
+
+
 fn next_preclosure<T>(
     context: &FormalContext<T>,
     implications: &Vec<(BitSet, BitSet)>,
@@ -62,7 +105,9 @@ fn next_preclosure<T>(
         if temp_set.contains(n) {
             temp_set.remove(n);
         } else {
-            let output: BitSet = implication_closure(implications, &temp_set.union(&current_attribute).collect());
+            ////////////////////////////////////
+            ////////////////////////////////////
+            let output: BitSet = implication_closure_lin(implications, &temp_set.union(&current_attribute).collect());
             if is_smallest_num(n, &output.difference(&temp_set).collect()) {
                 return output;
             }
@@ -75,7 +120,6 @@ fn next_preclosure<T>(
 pub fn canonical_basis<T>(context: &FormalContext<T>) -> Vec<(BitSet, BitSet)> {
     let mut temp_set = BitSet::new();
     let mut implications: Vec<(BitSet, BitSet)> = Vec::new();
-
     while temp_set != set_upto(context.attributes.len() - 1) {
         let temp_set_hull = context.index_attribute_hull(&temp_set);
         if temp_set != temp_set_hull {
