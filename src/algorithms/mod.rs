@@ -29,3 +29,11 @@ impl<T> FormalContext<T> {
         canonical_basis::canonical_basis(&self)
     }
 }
+
+impl<T> FormalContext<T> {
+    pub fn canonical_basis_optimised<'a>(
+        &'a self,
+    ) -> Vec<(BitSet, BitSet)> {
+        canonical_basis::canonical_basis_optimised(&self)
+    }
+}

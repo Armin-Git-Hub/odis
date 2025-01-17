@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Instant};
 use bit_set::BitSet;
 
 use crate::FormalContext;
@@ -18,6 +18,11 @@ fn set_upto(n: usize) -> BitSet {
         b.insert(i);
     }
     b
+}
+
+fn retain_eq_less(max: usize, input_set: &BitSet) -> BitSet {
+    let output = input_set.iter().filter(|x| x <= &max).collect();
+    output
 }
 
 fn implication_closure(implications: &Vec<(BitSet, BitSet)>, input: &BitSet) -> BitSet {
@@ -65,15 +70,15 @@ fn implication_closure_lin(implications: &Vec<(BitSet, BitSet)>, input: &BitSet)
             if list.contains_key(&a) {
                 list.get_mut(&a).unwrap().push((premise, conclusion));
             } else {
-                let new_vec = vec![(premise, conclusion)];
-                list.insert(a, new_vec);
+                list.insert(a, vec![(premise, conclusion)]);
             }
         }
     }
 
     let mut update = output.clone(); 
+    let empty_set = BitSet::new();
 
-    while update != BitSet::new() {
+    while update != empty_set {
         let m = update.iter().next().unwrap();
         update.remove(m);
 
@@ -91,6 +96,8 @@ fn implication_closure_lin(implications: &Vec<(BitSet, BitSet)>, input: &BitSet)
     output  
 }
 
+static mut TIME_CLOSURE: f64 = 0.0;
+static mut COUNT: usize = 0;
 
 fn next_preclosure<T>(
     context: &FormalContext<T>,
@@ -107,7 +114,12 @@ fn next_preclosure<T>(
         } else {
             ////////////////////////////////////
             ////////////////////////////////////
-            let output: BitSet = implication_closure_lin(implications, &temp_set.union(&current_attribute).collect());
+            let start = Instant::now();
+            let output: BitSet = implication_closure(implications, &temp_set.union(&current_attribute).collect());
+            unsafe {
+                TIME_CLOSURE += start.elapsed().as_secs_f64();
+                COUNT += 1;
+            }
             if is_smallest_num(n, &output.difference(&temp_set).collect()) {
                 return output;
             }
@@ -126,6 +138,67 @@ pub fn canonical_basis<T>(context: &FormalContext<T>) -> Vec<(BitSet, BitSet)> {
             implications.push((temp_set.clone(), temp_set_hull));
         }
         temp_set = next_preclosure(&context, &implications, &temp_set);
+    }
+    unsafe {
+        println!("{}", TIME_CLOSURE);
+        println!("{}", COUNT);
+        TIME_CLOSURE = 0.0;
+        COUNT = 0;
+    }
+    implications
+}
+
+pub fn canonical_basis_optimised<T>(context: &FormalContext<T>) -> Vec<(BitSet, BitSet)> {
+    let mut temp_set = context.index_attribute_hull(&BitSet::new());
+    let mut implications: Vec<(BitSet, BitSet)> = Vec::new();
+
+    if temp_set != BitSet::new() {
+        implications.push((BitSet::new(), temp_set.clone()));
+    }
+
+    let mut i = context.attributes.len() - 1;
+
+    while temp_set != set_upto(context.attributes.len() - 1) {
+
+        for j in (0..i + 1).rev() {
+            let mut j_set = BitSet::new();
+            j_set.insert(j);
+            if temp_set.contains(j) {
+                temp_set.difference_with(&j_set);
+            } else {
+                ////////////////////////////////////
+                ////////////////////////////////////
+                let start = Instant::now();
+                let b = implication_closure(&implications, &temp_set.union(&j_set).collect());
+                unsafe {
+                    TIME_CLOSURE += start.elapsed().as_secs_f64();
+                    COUNT += 1;
+                }
+                if is_smallest_num(j, &b.difference(&temp_set).collect()) { 
+                    temp_set = b;
+                    i = j;
+                    break;
+                }
+            }
+        }
+
+        let temp_set_hull = context.index_attribute_hull(&temp_set);
+        
+        if temp_set != temp_set_hull {
+            implications.push((temp_set.clone(), temp_set_hull.clone()));
+        }
+        if is_smallest_num(i, &temp_set_hull.difference(&temp_set).collect()) {
+            temp_set = temp_set_hull;
+            i = context.attributes.len() - 1;
+        } else {
+            temp_set = retain_eq_less(i, &temp_set);
+        }
+    }
+    unsafe {
+        println!("{}", TIME_CLOSURE);
+        println!("{}", COUNT);
+        TIME_CLOSURE = 0.0;
+        COUNT = 0;
     }
     implications
 }
