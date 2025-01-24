@@ -1,10 +1,10 @@
-use std::{collections::HashMap, time::Instant};
+use std::collections::HashMap;
 use bit_set::BitSet;
 
 use crate::FormalContext;
 
-fn is_smallest_num(max: usize, input_set: &BitSet) -> bool {
-    for n in 0..max {
+fn is_smallest_num(min: usize, input_set: &BitSet) -> bool {
+    for n in 0..min {
         if input_set.contains(n) {
             return false;
         }
@@ -28,6 +28,7 @@ fn retain_eq_less(max: usize, input_set: &BitSet) -> BitSet {
 fn implication_closure(implications: &Vec<(BitSet, BitSet)>, input: &BitSet) -> BitSet {
     let mut implications = implications.clone();
     let mut output = input.clone();
+
     loop {
         let mut indices = BitSet::new();
         let mut repeat = false;
@@ -43,7 +44,7 @@ fn implication_closure(implications: &Vec<(BitSet, BitSet)>, input: &BitSet) -> 
         }
         let mut count = 0;
         implications.retain(|_|
-            if indices.contains(count){
+            if indices.contains(count) {
                 count += 1;
                 false
             } else {
@@ -96,35 +97,24 @@ fn implication_closure_lin(implications: &Vec<(BitSet, BitSet)>, input: &BitSet)
     output  
 }
 
-static mut TIME_CLOSURE: f64 = 0.0;
-static mut COUNT: usize = 0;
-
 fn next_preclosure<T>(
     context: &FormalContext<T>,
     implications: &Vec<(BitSet, BitSet)>,
     input: &BitSet,
 ) -> BitSet {
     let mut temp_set = input.clone();
-    let mut current_attribute = BitSet::new();
 
-    for n in (0..context.attributes.len()).rev() {
-        current_attribute.insert(n);
-        if temp_set.contains(n) {
-            temp_set.remove(n);
+    for m in (0..context.attributes.len()).rev() {
+        if temp_set.contains(m) {
+            temp_set.remove(m);
         } else {
-            ////////////////////////////////////
-            ////////////////////////////////////
-            let start = Instant::now();
-            let output: BitSet = implication_closure(implications, &temp_set.union(&current_attribute).collect());
-            unsafe {
-                TIME_CLOSURE += start.elapsed().as_secs_f64();
-                COUNT += 1;
-            }
-            if is_smallest_num(n, &output.difference(&temp_set).collect()) {
+            temp_set.insert(m);
+            let output = implication_closure(implications, &temp_set);
+            if is_smallest_num(m, &output.difference(&temp_set).collect()) {
                 return output;
             }
+            temp_set.remove(m);
         }
-        current_attribute.clear();
     }
     return (0..context.attributes.len()).collect();
 }
@@ -138,12 +128,6 @@ pub fn canonical_basis<T>(context: &FormalContext<T>) -> Vec<(BitSet, BitSet)> {
             implications.push((temp_set.clone(), temp_set_hull));
         }
         temp_set = next_preclosure(&context, &implications, &temp_set);
-    }
-    unsafe {
-        println!("{}", TIME_CLOSURE);
-        println!("{}", COUNT);
-        TIME_CLOSURE = 0.0;
-        COUNT = 0;
     }
     implications
 }
@@ -161,19 +145,12 @@ pub fn canonical_basis_optimised<T>(context: &FormalContext<T>) -> Vec<(BitSet, 
     while temp_set != set_upto(context.attributes.len() - 1) {
 
         for j in (0..i + 1).rev() {
-            let mut j_set = BitSet::new();
-            j_set.insert(j);
             if temp_set.contains(j) {
-                temp_set.difference_with(&j_set);
+                temp_set.remove(j);
             } else {
-                ////////////////////////////////////
-                ////////////////////////////////////
-                let start = Instant::now();
-                let b = implication_closure(&implications, &temp_set.union(&j_set).collect());
-                unsafe {
-                    TIME_CLOSURE += start.elapsed().as_secs_f64();
-                    COUNT += 1;
-                }
+                temp_set.insert(j);
+                let b = implication_closure(&implications, &temp_set);
+                temp_set.remove(j);
                 if is_smallest_num(j, &b.difference(&temp_set).collect()) { 
                     temp_set = b;
                     i = j;
@@ -193,12 +170,6 @@ pub fn canonical_basis_optimised<T>(context: &FormalContext<T>) -> Vec<(BitSet, 
         } else {
             temp_set = retain_eq_less(i, &temp_set);
         }
-    }
-    unsafe {
-        println!("{}", TIME_CLOSURE);
-        println!("{}", COUNT);
-        TIME_CLOSURE = 0.0;
-        COUNT = 0;
     }
     implications
 }
