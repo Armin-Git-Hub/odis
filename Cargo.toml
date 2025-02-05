@@ -1,6 +1,7 @@
 [package]
 name = "odis"
 version = "0.0.1"
+authors = ["Armin Strupp"]
 edition = "2021"
 license = "AGPL-3.0-only"
 
