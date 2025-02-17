@@ -5,6 +5,7 @@ use crate::FormalContext;
 pub mod next_closure;
 pub mod fcbo;
 pub mod canonical_basis;
+pub mod attribute_exploration;
 
 impl<T> FormalContext<T> {
     pub fn index_concepts<'a>(
@@ -35,5 +36,13 @@ impl<T> FormalContext<T> {
         &'a self,
     ) -> Vec<(BitSet, BitSet)> {
         canonical_basis::canonical_basis_optimised(&self)
+    }
+}
+
+impl FormalContext<String> {
+    pub fn attribute_exploration<'a>(
+        &mut self,
+    ) -> Vec<(BitSet, BitSet)> {
+        attribute_exploration::attribute_exploration(self)
     }
 }

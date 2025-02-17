@@ -138,6 +138,20 @@ impl<T> FormalContext<T> {
         let attributes = self.index_object_derivation(objects);
         self.index_attribute_derivation(&attributes)
     }
+
+    /// Adds a new object with its corresponding attributes to the existing FormalContext.
+    pub fn add_object(&mut self, new_object: T, attributes: BitSet) {
+        self.objects.push(new_object);
+        let object_index = self.objects.len() - 1;
+        self.atomic_object_derivations.push(BitSet::new());
+        self.atomic_attribute_derivations.push(BitSet::new());
+
+        for attribute in attributes.into_iter() {
+            self.incidence.insert((object_index, attribute));
+            self.atomic_object_derivations[object_index].insert(attribute);
+            self.atomic_attribute_derivations[attribute].insert(object_index);
+        }
+    }
 }
 
 #[cfg(test)]

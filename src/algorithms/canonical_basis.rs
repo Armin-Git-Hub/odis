@@ -97,7 +97,7 @@ fn implication_closure_lin(implications: &Vec<(BitSet, BitSet)>, input: &BitSet)
     output  
 }
 
-fn next_preclosure<T>(
+pub fn next_preclosure<T>(
     context: &FormalContext<T>,
     implications: &Vec<(BitSet, BitSet)>,
     input: &BitSet,
