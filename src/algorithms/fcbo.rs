@@ -85,7 +85,7 @@ fn fcbo_next_concept<T>(
     input_attributes: &BitSet,
     inner_index: usize,
     dead_end_attr_set: &HashMap<usize, BitSet>,
-) -> OutputType{
+) -> OutputType {
 
     for j in inner_index..context.attributes.len() {
 

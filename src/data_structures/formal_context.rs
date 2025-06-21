@@ -1,7 +1,5 @@
 use std::{
-    collections::HashSet,
-    io::{BufRead, Error},
-    num::ParseIntError,
+    collections::HashSet, io::{BufRead, Error}, num::ParseIntError
 };
 
 use bit_set::{self, BitSet};
@@ -25,13 +23,14 @@ impl From<ParseIntError> for FormatError {
     }
 }
 
+#[derive(Clone)]
 /// The main data structure of formal concept analysis. The incidence is given as a set of tuples, referring to the indices of the object and attribute vectors.
 pub struct FormalContext<T> {
     pub objects: Vec<T>,
     pub attributes: Vec<T>,
     pub incidence: HashSet<(usize, usize)>,
-    atomic_object_derivations: Vec<BitSet>,
-    atomic_attribute_derivations: Vec<BitSet>,
+    pub atomic_object_derivations: Vec<BitSet>,
+    pub atomic_attribute_derivations: Vec<BitSet>,
 }
 
 impl<T> FormalContext<T> {
@@ -140,17 +139,103 @@ impl<T> FormalContext<T> {
     }
 
     /// Adds a new object with its corresponding attributes to the existing FormalContext.
-    pub fn add_object(&mut self, new_object: T, attributes: BitSet) {
+    pub fn add_object(&mut self, new_object: T, attributes: &BitSet) {
         self.objects.push(new_object);
         let object_index = self.objects.len() - 1;
         self.atomic_object_derivations.push(BitSet::new());
-        self.atomic_attribute_derivations.push(BitSet::new());
 
-        for attribute in attributes.into_iter() {
+        for attribute in attributes.iter() {
             self.incidence.insert((object_index, attribute));
             self.atomic_object_derivations[object_index].insert(attribute);
             self.atomic_attribute_derivations[attribute].insert(object_index);
         }
+    }
+
+    /// Adds a new attribute with its corresponding objects to the existing FormalContext.
+    pub fn add_attribute(&mut self, new_attribute: T, objects: &BitSet) {
+        self.attributes.push(new_attribute);
+        let attribute_index = self.attributes.len() - 1;
+        self.atomic_attribute_derivations.push(BitSet::new());
+
+        for object in objects.iter() {
+            self.incidence.insert((attribute_index, object));
+            self.atomic_object_derivations[object].insert(attribute_index);
+            self.atomic_attribute_derivations[attribute_index].insert(object);
+        }
+    }
+
+    /// Removes the object at the specified index from the existing FormalContext.
+    pub fn remove_object(&mut self, index: usize) {
+        for n in 0..self.attributes.len() {
+            self.incidence.remove(&(index, n));
+        }
+
+        self.incidence = self.incidence.iter().map(|x| {
+            if x.0 > index {
+                (x.0 - 1, x.1)
+            } else {
+                *x
+            }
+        }).collect();
+
+        for n in 0..self.attributes.len() {
+            self.atomic_attribute_derivations[n].remove(index);
+        }
+
+        for n in 0..self.attributes.len() {
+            self.atomic_attribute_derivations[n] = self.atomic_attribute_derivations[n].iter().map(|x| {
+                if x > index {
+                    x - 1
+                } else {
+                    x
+                }
+            }).collect();
+        }
+
+        self.atomic_object_derivations.remove(index);
+        self.objects.remove(index);
+    }
+
+    /// Removes the attribute at the specified index from the existing FormalContext.
+    pub fn remove_attribute(&mut self, index: usize) {
+        for n in 0..self.objects.len() {
+            self.incidence.remove(&(n, index));
+        }
+
+        self.incidence = self.incidence.iter().map(|x| {
+            if x.1 > index {
+                (x.0, x.1 - 1)
+            } else {
+                *x
+            }
+        }).collect();
+
+        for n in 0..self.objects.len() {
+            self.atomic_object_derivations[n].remove(index);
+        }
+
+        for n in 0..self.objects.len() {
+            self.atomic_object_derivations[n] = self.atomic_object_derivations[n].iter().map(|x| {
+                if x > index {
+                    x - 1
+                } else {
+                    x
+                }
+            }).collect();
+        }
+
+        self.atomic_attribute_derivations.remove(index);
+        self.attributes.remove(index);
+    }
+
+    /// Changes the name of a object at the specified index to the specified name.
+    pub fn change_object_name(&mut self, name: T, index: usize) {
+        self.objects[index] = name;
+    }
+
+    /// Changes the name of a attribute at the specified index to the specified name.
+    pub fn change_attribute_name(&mut self, name: T, index: usize) {
+        self.attributes[index] = name;
     }
 }
 

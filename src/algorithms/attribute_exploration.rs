@@ -99,15 +99,14 @@ pub fn attribute_exploration(context: &mut FormalContext<String>) -> Vec<(BitSet
     let mut temp_set = BitSet::new();
 
     while temp_set != (0..context.attributes.len()).collect() {
-        while temp_set != context.index_attribute_hull(&temp_set) {
-            let temp_set_hull = context.index_attribute_hull(&temp_set);
-
+        let temp_set_hull = context.index_attribute_hull(&temp_set);
+        while temp_set != temp_set_hull {
             if first_question(&context, (&temp_set, &temp_set_hull.difference(&temp_set).collect())) {
                 basis.push((temp_set.clone(), temp_set_hull));
                 break;
             } else {
                 let (new_object, attributes) = second_question(&context);
-                context.add_object(new_object, attributes);
+                context.add_object(new_object, &attributes);
             }
         }
         temp_set = canonical_basis::next_preclosure(context, &basis, &temp_set)
