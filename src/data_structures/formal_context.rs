@@ -1,5 +1,7 @@
 use std::{
-    collections::HashSet, io::{BufRead, Error}, num::ParseIntError
+    collections::HashSet,
+    io::{BufRead, Error},
+    num::ParseIntError,
 };
 
 use bit_set::{self, BitSet};
@@ -35,8 +37,10 @@ pub struct FormalContext<T> {
 
 impl<T> FormalContext<T> {
     fn construct(objects: Vec<T>, attributes: Vec<T>, incidence: HashSet<(usize, usize)>) -> Self {
-        let mut atomic_object_derivations = vec![BitSet::with_capacity(attributes.len()); objects.len()];
-        let mut atomic_attribute_derivations = vec![BitSet::with_capacity(objects.len()); attributes.len()];
+        let mut atomic_object_derivations =
+            vec![BitSet::with_capacity(attributes.len()); objects.len()];
+        let mut atomic_attribute_derivations =
+            vec![BitSet::with_capacity(objects.len()); attributes.len()];
         for &(g, m) in incidence.iter() {
             atomic_object_derivations[g].insert(m);
             atomic_attribute_derivations[m].insert(g);
@@ -170,26 +174,21 @@ impl<T> FormalContext<T> {
             self.incidence.remove(&(index, n));
         }
 
-        self.incidence = self.incidence.iter().map(|x| {
-            if x.0 > index {
-                (x.0 - 1, x.1)
-            } else {
-                *x
-            }
-        }).collect();
+        self.incidence = self
+            .incidence
+            .iter()
+            .map(|x| if x.0 > index { (x.0 - 1, x.1) } else { *x })
+            .collect();
 
         for n in 0..self.attributes.len() {
             self.atomic_attribute_derivations[n].remove(index);
         }
 
         for n in 0..self.attributes.len() {
-            self.atomic_attribute_derivations[n] = self.atomic_attribute_derivations[n].iter().map(|x| {
-                if x > index {
-                    x - 1
-                } else {
-                    x
-                }
-            }).collect();
+            self.atomic_attribute_derivations[n] = self.atomic_attribute_derivations[n]
+                .iter()
+                .map(|x| if x > index { x - 1 } else { x })
+                .collect();
         }
 
         self.atomic_object_derivations.remove(index);
@@ -202,50 +201,73 @@ impl<T> FormalContext<T> {
             self.incidence.remove(&(n, index));
         }
 
-        self.incidence = self.incidence.iter().map(|x| {
-            if x.1 > index {
-                (x.0, x.1 - 1)
-            } else {
-                *x
-            }
-        }).collect();
+        self.incidence = self
+            .incidence
+            .iter()
+            .map(|x| if x.1 > index { (x.0, x.1 - 1) } else { *x })
+            .collect();
 
         for n in 0..self.objects.len() {
             self.atomic_object_derivations[n].remove(index);
         }
 
         for n in 0..self.objects.len() {
-            self.atomic_object_derivations[n] = self.atomic_object_derivations[n].iter().map(|x| {
-                if x > index {
-                    x - 1
-                } else {
-                    x
-                }
-            }).collect();
+            self.atomic_object_derivations[n] = self.atomic_object_derivations[n]
+                .iter()
+                .map(|x| if x > index { x - 1 } else { x })
+                .collect();
         }
 
         self.atomic_attribute_derivations.remove(index);
         self.attributes.remove(index);
     }
 
-    /// Changes the name of a object at the specified index to the specified name.
+    /// Changes the name of a object at the specified index to the given name.
     pub fn change_object_name(&mut self, name: T, index: usize) {
         self.objects[index] = name;
     }
 
-    /// Changes the name of a attribute at the specified index to the specified name.
+    /// Changes the name of a attribute at the specified index to the given name.
     pub fn change_attribute_name(&mut self, name: T, index: usize) {
         self.attributes[index] = name;
+    }
+
+    /// In place sorts the concepts in lectic order.
+    pub fn sort_lectic_order(&self, concepts: &mut [(BitSet, BitSet)]) {
+        let lenght = self.attributes.len();
+        let weight: Vec<usize> = (1..(lenght + 1)).map(|x| 2_usize.pow(x as u32)).collect();
+
+        let mut order: Vec<(usize, usize)> = Vec::new();
+
+        for (index, (_, set)) in concepts.iter().enumerate() {
+            let mut sum = 0;
+            for n in set {
+                sum += weight[lenght - 1 - n]
+            }
+            order.push((index, sum));
+        }
+
+        order.sort_by(|x, y| x.1.cmp(&y.1));
+
+        for index in 0..(order.len() - 1) {
+            let swap = order[index].0;
+            if index != swap {
+                concepts.swap(index, swap);
+                let correction = order.iter().position(|x| x.0 == index).unwrap();
+                order[index] = (0, 0);
+                order[correction] = (swap, 0);
+            }
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-
-    use std::fs;
+    use super::FormalContext;
     use bit_set::BitSet;
     use itertools::Itertools;
-    use super::FormalContext;
+    use std::fs;
+
     #[test]
     fn test_read_context() {
         let context =
@@ -265,15 +287,13 @@ mod tests {
         assert!(context.incidence.contains(&(1, 5)));
         assert!(context.incidence.contains(&(1, 6)));
     }
+
     #[test]
     fn text_index_derivations() {
         let context =
             FormalContext::<String>::from(&fs::read("test_data/eu.cxt").unwrap()).unwrap();
 
-        assert_eq!(
-            context.index_attribute_derivation(&BitSet::new()).len(),
-            48
-        );
+        assert_eq!(context.index_attribute_derivation(&BitSet::new()).len(), 48);
         assert_eq!(context.index_object_derivation(&BitSet::new()).len(), 7);
         let context = FormalContext::<String>::from(
             &fs::read("test_data/living_beings_and_water.cxt").unwrap(),
@@ -328,6 +348,7 @@ mod tests {
             BitSet::from_bytes(&[0b10000010])
         );
     }
+
     #[test]
     fn text_index_hulls() {
         let context = FormalContext::<String>::from(
@@ -360,5 +381,20 @@ mod tests {
             let hull = context.index_attribute_hull(&sub);
             assert!(sub.is_subset(&hull));
         }
+    }
+
+    #[test]
+    fn lectic_sort() {
+        let context =
+            FormalContext::<String>::from(&fs::read("test_data/copy.cxt").unwrap()).unwrap();
+
+        let mut concepts_unsorted: Vec<(BitSet, BitSet)> = context.fcbo_index_concepts().collect();
+        let concepts_sorted: Vec<(BitSet, BitSet)> = context.index_concepts().collect();
+
+        assert!(concepts_sorted != concepts_unsorted);
+
+        context.sort_lectic_order(&mut concepts_unsorted);
+
+        assert!(concepts_sorted == concepts_unsorted);
     }
 }
