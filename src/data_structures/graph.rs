@@ -6,15 +6,16 @@ use crate::FormalContext;
 pub struct Graph<T> {
     pub width: usize,
     pub height: usize,
+    pub edges: Vec<(u32, u32)>,
     pub nodes: Vec<Node<T>>,
 }
 
 #[derive(PartialEq)]
 pub struct Node<T> {
-    id: usize,
-    x: usize,
-    y: usize,
-    label: (Option<T>, Option<T>),
+    pub id: usize,
+    pub x: usize,
+    pub y: usize,
+    pub label: (Option<T>, Option<T>),
 }
 
 struct Task<'a> {
@@ -34,6 +35,7 @@ impl<T: Clone> Graph<T> {
         Graph {
             width: 0,
             height: 0,
+            edges: Vec::new(),
             nodes: Vec::new(),
         }
     }
@@ -151,6 +153,7 @@ impl<T: Clone> Graph<T> {
         let graph = Graph {
             width: width,
             height: height,
+            edges: edges,
             nodes: nodes,
         };
 
