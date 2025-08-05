@@ -2,17 +2,14 @@ use bit_set::BitSet;
 
 use crate::FormalContext;
 
-fn next_concept<T>(
-    context: &FormalContext<T>,
-    a: &BitSet,
-) -> Option<(BitSet, BitSet)> {
+fn next_concept<T>(context: &FormalContext<T>, a: &BitSet) -> Option<(BitSet, BitSet)> {
     let mut a_new = a.clone();
     let mut temp = Vec::new();
     for n in a.iter() {
         temp.push(n);
     }
     temp.reverse();
-    let mut a_iter  = temp.iter();
+    let mut a_iter = temp.iter();
     let mut a_next = a_iter.next();
     for i in (0..context.attributes.len()).rev() {
         if Some(&i) == a_next {

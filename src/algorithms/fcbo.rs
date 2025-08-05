@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use bit_set::BitSet;
+use std::collections::HashMap;
 
 use crate::FormalContext;
 
@@ -52,12 +52,16 @@ fn canonicity_test_one(
     input_attributes: &BitSet,
     dead_end_attr_set: &HashMap<usize, BitSet>,
 ) -> bool {
-    dead_end_attr_set.get(&inner_index)
-    .unwrap()
-    .intersection(&smaller_subsets[inner_index])
-    .collect::<BitSet>()
-    .is_subset(&input_attributes.intersection(&smaller_subsets[inner_index])
-    .collect())
+    dead_end_attr_set
+        .get(&inner_index)
+        .unwrap()
+        .intersection(&smaller_subsets[inner_index])
+        .collect::<BitSet>()
+        .is_subset(
+            &input_attributes
+                .intersection(&smaller_subsets[inner_index])
+                .collect(),
+        )
 }
 
 // Old canonicity test from paper
@@ -68,14 +72,12 @@ fn canonicity_test_two(
     next_attributes: &BitSet,
 ) -> bool {
     input_attributes
-    .intersection(&smaller_subsets[inner_index])
-    .collect::<BitSet>()
-    ==
-    next_attributes
-    .intersection(&smaller_subsets[inner_index])
-    .collect()
+        .intersection(&smaller_subsets[inner_index])
+        .collect::<BitSet>()
+        == next_attributes
+            .intersection(&smaller_subsets[inner_index])
+            .collect()
 }
-
 
 // Calculates a single OutputType enum
 // Closely follows the pseudo code from paper but leaves out the halting condition which is checked in fcbo_concepts
@@ -86,17 +88,17 @@ fn fcbo_next_concept<T>(
     inner_index: usize,
     dead_end_attr_set: &HashMap<usize, BitSet>,
 ) -> OutputType {
-
     for j in inner_index..context.attributes.len() {
-
-        if !input_attributes.contains(j) && canonicity_test_one(smaller_subsets,j, input_attributes, dead_end_attr_set) {
+        if !input_attributes.contains(j)
+            && canonicity_test_one(smaller_subsets, j, input_attributes, dead_end_attr_set)
+        {
             let mut new_attr = BitSet::new();
             new_attr.insert(j);
 
-            let next_objects= context
-            .index_attribute_derivation(input_attributes)
-            .intersection(&context.index_attribute_derivation(&new_attr))
-            .collect();
+            let next_objects = context
+                .index_attribute_derivation(input_attributes)
+                .intersection(&context.index_attribute_derivation(&new_attr))
+                .collect();
             let next_attributes = context.index_object_derivation(&next_objects);
 
             if canonicity_test_two(smaller_subsets, j, input_attributes, &next_attributes) {
@@ -109,13 +111,12 @@ fn fcbo_next_concept<T>(
     return OutputType::NodeCleared;
 }
 
-
 // Returns an iterator which has a formal concepts as an item
 // The concepts are only calculated when requested with .next() or .collect()
 pub fn fcbo_concepts<'a, T>(
     context: &'a FormalContext<T>,
 ) -> impl Iterator<Item = (BitSet, BitSet)> + 'a {
-    // Initializing the starting state needed for calling fcbo_next_concept 
+    // Initializing the starting state needed for calling fcbo_next_concept
 
     // Constant used throughout the function
     let attr_length = context.attributes.len();
@@ -161,18 +162,19 @@ pub fn fcbo_concepts<'a, T>(
                 &smaller_subsets,
                 &input_attributes,
                 inner_index,
-                &dead_end_attr_set
+                &dead_end_attr_set,
             );
 
             match output {
                 // 1: New concept is added to queue and the concept is returned, increments index for the next fcbo_next_concept call
                 OutputType::FormalConcept(formal_concept, previous_inner_index) => {
-
                     // Increments the index for the next call of fcbo_next_concept
                     inner_index = previous_inner_index + 1;
 
                     // Checks the halting condition before adding the new concept to queue to prevent unnecessary queue entries
-                    if formal_concept.1 != (0..attr_length).collect() && previous_inner_index < attr_length - 1 {
+                    if formal_concept.1 != (0..attr_length).collect()
+                        && previous_inner_index < attr_length - 1
+                    {
                         branches += 1;
                         queue.push(CallingContext::new(formal_concept.1.clone(), inner_index));
                     }
@@ -209,19 +211,21 @@ pub fn fcbo_concepts<'a, T>(
     })
 }
 
-
 #[cfg(test)]
 mod tests {
-    
-    use std::{collections::BTreeSet, fs};
+
     use bit_set::BitSet;
     use itertools::Itertools;
+    use std::{collections::BTreeSet, fs};
 
     use crate::{algorithms::fcbo::fcbo_concepts, FormalContext};
 
     #[test]
     fn test_data_1() {
-        let context = FormalContext::<String>::from(&fs::read("test_data/living_beings_and_water.cxt").unwrap()).unwrap();
+        let context = FormalContext::<String>::from(
+            &fs::read("test_data/living_beings_and_water.cxt").unwrap(),
+        )
+        .unwrap();
 
         let concepts: BTreeSet<_> = fcbo_concepts(&context).map(|(_, x)| x).collect();
 
@@ -238,7 +242,8 @@ mod tests {
 
     #[test]
     fn test_data_2() {
-        let context = FormalContext::<String>::from(&fs::read("test_data/eu.cxt").unwrap()).unwrap();
+        let context =
+            FormalContext::<String>::from(&fs::read("test_data/eu.cxt").unwrap()).unwrap();
 
         let concepts: BTreeSet<_> = fcbo_concepts(&context).map(|(_, x)| x).collect();
 
@@ -255,7 +260,9 @@ mod tests {
 
     #[test]
     fn test_data_3() {
-        let context = FormalContext::<String>::from(&fs::read("test_data/data_from_paper.cxt").unwrap()).unwrap();
+        let context =
+            FormalContext::<String>::from(&fs::read("test_data/data_from_paper.cxt").unwrap())
+                .unwrap();
 
         let concepts: BTreeSet<_> = fcbo_concepts(&context).map(|(_, x)| x).collect();
 
