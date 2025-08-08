@@ -1,11 +1,13 @@
 [package]
 name = "odis"
 version = "0.0.1"
+authors = ["Armin Strupp"]
 edition = "2021"
 license = "AGPL-3.0-only"
 
 [dependencies]
 bit-set = "0.8.0"
+rust-sugiyama = "0.3.0"
 
 [dev-dependencies]
 itertools = "0.13.0"
